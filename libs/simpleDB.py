@@ -154,11 +154,26 @@ class simpleDB():
 				else:
 					sql += value[0]+value[1]+"'"+value[2]+"' "+value[3]
 			sql = sql[:-4]
+		
+		# reset for the next query
+		self.query = {
+			"build":False,
+			"table":None,
+			"where":[],
+			"orwhere":[],
+			"update":[],
+			"insert":[],
+			"columns":[],
+			"command":"select"
+		}
+
 		return sql
 	'''
 		gets the result from the query
 	'''
-	def get(self):
+	def get(self, selfcommit=None):
+		if(not selfcommit is None):
+			self.selfcommit = selfcommit
 		# if the query is using the query builder
 		if self.query['build']:
 			self.execute(self.build(),self.commit)
