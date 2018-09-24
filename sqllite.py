@@ -1,10 +1,10 @@
-from tstpydb import tstpydb
+from libs import simpledb
 
 '''
 USAGE EXAMPLES
 '''
 
-db = tstpydb.tstPyDb('_sqlite','user.db')
+db = simpledb.simpleDB('_sqlite','user.db')
 
 '''
 INSERT INTO Users (Id,Name) VALUES ("5","William")

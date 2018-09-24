@@ -1,10 +1,10 @@
-from tstpydb import tstpydb
+from libs import simpledb
 
 ''' 
 CONNECT REMOTE
 This connection stream will vary based on your avaiable drivers
 '''
-db = tstpydb.tstPyDb('_pyodbc',{
+db = simpledb.simpleDB('_pyodbc',{
 	"driver":"ODBC Driver 13 for SQL Server",
 	"server":"192.168.xxx.xxx",
 	"database":"myDatabase",
