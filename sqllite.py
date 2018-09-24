@@ -1,4 +1,4 @@
-from libs import simpledb
+from simpledb import simpledb
 
 '''
 USAGE EXAMPLES
