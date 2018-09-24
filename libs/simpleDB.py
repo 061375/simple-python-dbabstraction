@@ -8,17 +8,32 @@ simpleDB @class
 class simpleDB():
 
 	def __init__(self, driver, connectionString):
+		self.commit = False
+		# @var dictionary
+		self.query = {
+			"build":False,
+			"table":None,
+			"where":[],
+			"orwhere":[],
+			"update":[],
+			"insert":[],
+			"columns":[],
+			"command":"select"
+		}
+		
 		if driver == '_pymssql':
 			self.conn = _pymssql(connectionString).get_conn()
 		elif driver == '_pyodbc':
 			self.conn = _pyodbc(connectionString).get_conn()
+		elif driver == '_sqlite':
+			self.conn = _sqlite(connectionString).get_conn()
 		else:
 			print("Error: Requested driver was not found")
 			sys.exit()
 		self.cursor = self.conn.cursor()
 	'''
-	@param self
-	@param string
+		@param self
+		@param string
 	'''
 	def execute(self, sql, commit=True):
 		try:
@@ -30,76 +45,125 @@ class simpleDB():
 		return self
 	'''
 		@param self
-		@param string - table
-		@param list - cols - id,title,date,...
-		@param dictionary - Example:
-			{
-				1:{"key":"id","oper":"=","value":"33","andor":"AND"},
-				2:{"key":"id","oper":"=","value":"33","andor":""}
-			}
+		@param string
 	'''
-	def select(self, table, cols, where, commit=False):
-		sql = "SELECT "
-		for col in cols:
-			sql += col+","
-		sql = sql[:-1]
-		sql += " FROM "+table
-		if not where:
-			sql += ""
-		else:
-			sql += " WHERE "
-			for wrow in where.items():
-				for row in wrow.items():
-					if "" == row['andor']:
-						row['andor'] = "     "
-					sql += row['key']+" "+row['oper']+" "+row['value']+"'  "+row['andor']+" "
-			sql = sql[:-5]
-
-		return self.execute(sql,commit)
+	def table(self, table):
+		self.query['build'] = True
+		self.query['table'] = table
+		return self
 	'''
 		@param self
-		@param string - table
-		@param list - cols - id,title,date,...
-		@param dictionary - Example:
-			{
-				"temp":"100"
-			},
-			{
-				"machine":"enviropiI"
-			}
+		@param list
 	'''
-	def update(self, table, update, where,commit=True):
-		sql = "UPDATE "+table+" SET "
-		for key, value in update.items():
-			if unicode(value,'utf-8').isnumeric():
-				sql += key+"="+value+","
-			else:
-				sql += key+"='"+value+"',"
-		sql = sql[:-1]
-		sql += " WHERE "
-		for key, value in where.items():
-			# make sure the right data type is being created
+	def select(self,columns):
+		self.query['build'] = True
+		self.query['columns'] = columns
+		return self
+	'''
+		@param self
+		@param dict {"column":"value"}
+	'''
+	def update(self, elem):
+		self.query['build'] = True
+		self.query['command'] = "update"
+		self.query['update'].append(elem)
+		return self	
+	'''
+		@param self
+		@param dict {"column":"value"}
+	'''
+	def delete(self, elem):
+		self.query['build'] = True
+		self.query['command'] = "delete"
+		return self	
+	'''
+	'''
+	def insert(self, elem):
+		self.query['build'] = True
+		self.query['command'] = "insert"
+		self.query['insert'].append(elem)
+		return self	
+	'''
+		@param self
+		@param string
+		@param string
+		@param mixed
+		@param string
+	'''
+	def where(self,column,operator,value,_or=False):
+		self.query['build'] = True
+		self.query['where'].append([column,operator,value,_or])
+		return self
+	'''
+		@param self
 
-			if unicode(value,'utf-8').isnumeric():
-				sql += key+"="+value+" AND"
+		@todo deal with TOP and LIMIT
+		@todo nested
+		@todo UNION
+	'''
+	def build(self):
+
+		if self.query['command']=='select':
+			sql = "SELECT "
+			# do select
+			if len(self.query['columns']) < 1:
+				sql += '*'
 			else:
-				sql += key+"='"+value+"' AND"
-		sql = sql[:-3]
-		'''
-		@todo
-		for wrow in where.items():
-			for row in wrow.items():
-				if "" == row['andor']:
-					row['andor'] = "     "
-				sql += row['key']+" "+row['oper']+" "+row['value']+"'  "+row['andor']+" "
-		sql = sql[:-5]
-		'''
-		#print(sql)
-		return self.execute(sql,commit)
+				sql += ','.join(self.query['columns'])
+			sql += ' FROM '+self.query['table']
+			
+		elif self.query['command']=='insert':
+			self.commit = True
+			# do insert
+			sql = "INSERT INTO "+self.query['table']+" ("
+			a = []
+			b = []
+			for _dict in self.query['insert']:
+				for key,value in insdict.items():
+					a.append(key)
+					b.append(value)
+
+			sql += ','.join(a)+") VALUES ('"+"','".join(b)+"')"
+
+		elif self.query['command']=='update':
+			self.commit = True
+			# do update
+			sql = "UPDATE "+self.query['table']+" SET "
+			for _dict in self.query['update']:
+				for key,value in _dict.items():
+					if str(value).isnumeric():
+						sql += key+"="+value+","
+					else:
+						sql += key+"='"+value+"',"
+			sql = sql[:-1]
+			
+		else:
+			# throw error
+			print('Error: unknown command '+self.query['command'])
+
+		if len(self.query['where']) > 0:
+			# do where
+			sql += ' WHERE '
+			for value in self.query['where']:
+				if False == value[3]:
+					value[3] = "AND "
+				else:
+					value[3] = "OR "
+				if str(value[2]).isnumeric():
+					sql += value[0]+value[1]+value[2]+" "+value[3]
+				else:
+					sql += value[0]+value[1]+"'"+value[2]+"' "+value[3]
+			sql = sql[:-4]
+		return sql
 	'''
 		gets the result from the query
 	'''
 	def get(self):
+		# if the query is using the query builder
+		if self.query['build']:
+			self.execute(self.build(),self.commit)
+			self.commit = False
+
 		return self.cursor
 	'''
 		close the connection
@@ -152,8 +216,6 @@ class _oracle():
 		return self.conn;
 '''
 @class _sqlite
-	###### NOTE ! ######
-	-- This is untested and should NOT be used
 '''
 class _sqlite():
 	def __init__(self, cs):
@@ -161,4 +223,5 @@ class _sqlite():
 		self.conn = lite.connect(cs)
 	def get_conn(self):
 		return self.conn;
+
 
